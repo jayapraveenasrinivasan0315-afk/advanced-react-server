@@ -13,7 +13,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { GetUserId } from '../auth/decorators/get-user-id.decorator';
+import { GetUserId } from '../decorators/get-user-id.decorator';
 
 @Controller('orders')
 export class OrderController {

@@ -86,6 +86,81 @@ export class CategoryService {
     return category;
   }
 
+  private async getBreadcrumbs(
+    categoryId: string,
+    locale: string,
+  ): Promise<{ id: string; name: string; slug: string }[]> {
+    // Явно вказуємо тип для масиву breadcrumbs
+    const breadcrumbs: { id: string; name: string; slug: string }[] = [];
+
+    // Змінюємо тип currentId на string | null
+    let currentId: string | null = categoryId;
+
+    // Проходимо по дереву вгору, поки є батьківські категорії (currentId не null)
+    while (currentId) {
+      const category = await this.prisma.category.findUnique({
+        where: { id: currentId },
+        include: {
+          translations: locale ? { where: { locale } } : true,
+          parent: true, // Включаємо parent, щоб отримати parentId коректно
+        },
+      });
+
+      if (!category) break;
+
+      // Використовуємо існуючу логіку трансформації для отримання правильної назви/slug
+      // Важливо: для getBreadcrumbs нам потрібні лише name, slug та id.
+      const transformed = this.transformCategoryWithTranslation(
+        { ...category },
+        locale,
+      );
+
+      // Перевіряємо, чи існують id, name та slug перед додаванням
+      if (transformed.id && transformed.name && transformed.slug) {
+        // Додаємо на початок масиву (щоб порядок був: Root -> Child -> Current)
+        breadcrumbs.unshift({
+          id: transformed.id,
+          // Примусове приведення до string, оскільки трансформація гарантує їх наявність
+          name: transformed.name as string,
+          slug: transformed.slug as string,
+        });
+      }
+
+      // Оновлюємо currentId. Тепер currentId може бути string або null.
+      currentId = category.parentId;
+    }
+
+    return breadcrumbs;
+  }
+
+  async getBreadcrumbsBySlug(slug: string, locale: string = 'en') {
+    // 1. Знайти категорію за основним slug
+    let category = await this.prisma.category.findUnique({
+      where: { slug },
+      select: { id: true }, // Нам потрібен лише ID
+    });
+
+    // 2. Якщо не знайдено, знайти за slug перекладу
+    if (!category) {
+      const translation = await this.prisma.categoryTranslation.findFirst({
+        where: { slug },
+        select: { categoryId: true },
+      });
+
+      if (translation) {
+        category = { id: translation.categoryId };
+      }
+    }
+
+    if (!category) {
+      throw new NotFoundException(`Category with slug "${slug}" not found`);
+    }
+
+    // 3. Побудувати та повернути хлібні крихти
+    return this.getBreadcrumbs(category.id, locale);
+  }
+  // -----------------------------------
+
   async create(createCategoryDto: CreateCategoryI18nDto) {
     const { translations, ...categoryData } = createCategoryDto;
 
@@ -389,8 +464,6 @@ export class CategoryService {
   }
 
   async getTopLevelCategories(locale: string = 'en') {
-    console.log(1);
-
     const categories = await this.prisma.category.findMany({
       where: {
         parentId: null,
@@ -440,5 +513,203 @@ export class CategoryService {
     });
 
     return tree;
+  }
+
+  async findChildrenBySlug(slug: string, locale: string = 'en') {
+    // 1. Try main slug
+    let category = await this.prisma.category.findUnique({
+      where: { slug },
+      include: {
+        children: {
+          where: { isActive: true },
+          include: {
+            translations: locale ? { where: { locale } } : true,
+            _count: {
+              select: {
+                products: true,
+              },
+            },
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+    });
+
+    // 2. Try translation slug
+    if (!category) {
+      const translation = await this.prisma.categoryTranslation.findFirst({
+        where: { slug },
+        include: {
+          category: {
+            include: {
+              children: {
+                where: { isActive: true },
+                include: {
+                  translations: locale ? { where: { locale } } : true,
+                  _count: {
+                    select: {
+                      products: true,
+                    },
+                  },
+                },
+                orderBy: {
+                  name: 'asc',
+                },
+              },
+            },
+          },
+        },
+      });
+
+      category = translation?.category ?? null;
+    }
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    // 3. Transform children only
+    return category.children.map((child: any) =>
+      this.transformCategoryWithTranslation(child, locale),
+    );
+  }
+
+  async getCategoryNavigation(slug?: string, locale: string = 'en') {
+    // Якщо slug не передано - повертаємо топ-рівень категорії
+    if (!slug) {
+      const categories = await this.prisma.category.findMany({
+        where: {
+          parentId: null,
+          isActive: true,
+        },
+        include: this.getIncludeWithTranslations(locale),
+      });
+
+      return {
+        currentCategory: null,
+        parentCategory: null,
+        items: categories.map((cat) =>
+          this.transformCategoryWithTranslation(cat, locale),
+        ),
+        isShowingSubcategories: false,
+        breadcrumbs: [],
+      };
+    }
+
+    let category = await this.prisma.category.findUnique({
+      where: { slug, isActive: true },
+      include: {
+        parent: {
+          include: {
+            translations: locale ? { where: { locale } } : true,
+            children: {
+              where: { isActive: true },
+              include: {
+                translations: locale ? { where: { locale } } : true,
+                _count: { select: { products: true } },
+              },
+            },
+          },
+        },
+        children: {
+          where: { isActive: true },
+          include: {
+            translations: locale ? { where: { locale } } : true,
+            _count: { select: { products: true } },
+          },
+        },
+        translations: locale ? { where: { locale } } : true,
+        _count: { select: { products: true } },
+      },
+    });
+
+    if (!category) {
+      const translation = await this.prisma.categoryTranslation.findFirst({
+        where: { slug },
+        include: {
+          category: {
+            include: {
+              parent: {
+                include: {
+                  translations: locale ? { where: { locale } } : true,
+                  children: {
+                    where: { isActive: true },
+                    include: {
+                      translations: locale ? { where: { locale } } : true,
+                      _count: { select: { products: true } },
+                    },
+                  },
+                },
+              },
+              children: {
+                where: { isActive: true },
+                include: {
+                  translations: locale ? { where: { locale } } : true,
+                  _count: { select: { products: true } },
+                },
+              },
+              translations: locale ? { where: { locale } } : true,
+              _count: { select: { products: true } },
+            },
+          },
+        },
+      });
+
+      category = translation?.category ?? null;
+    }
+
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const breadcrumbs = await this.getBreadcrumbs(category.id, locale);
+
+    const transformedCategory = this.transformCategoryWithTranslation(
+      { ...category },
+      locale,
+    );
+
+    let items: any = [];
+    let parentCategory = null;
+    let isShowingSubcategories = false;
+
+    if (category.parent) {
+      parentCategory = this.transformCategoryWithTranslation(
+        { ...category.parent },
+        locale,
+      );
+      items = category.parent.children.map((child) =>
+        this.transformCategoryWithTranslation(child, locale),
+      );
+      isShowingSubcategories = true;
+    } else if (category.children && category.children.length > 0) {
+      items = category.children.map((child) =>
+        this.transformCategoryWithTranslation(child, locale),
+      );
+      isShowingSubcategories = true;
+    } else {
+      const topCategories = await this.prisma.category.findMany({
+        where: {
+          parentId: null,
+          isActive: true,
+        },
+        include: this.getIncludeWithTranslations(locale),
+      });
+
+      items = topCategories.map((cat) =>
+        this.transformCategoryWithTranslation(cat, locale),
+      );
+      isShowingSubcategories = false;
+    }
+
+    return {
+      currentCategory: transformedCategory,
+      parentCategory,
+      items,
+      isShowingSubcategories,
+      breadcrumbs,
+    };
   }
 }

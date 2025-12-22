@@ -17,7 +17,42 @@ export class ProductQueryDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  categoryIds?: string[];
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.split(',').map((v) => v.trim());
+    }
+    return [value];
+  })
+  brands?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.split(',').map((v) => v.trim());
+    }
+    return [value];
+  })
+  countries?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true')
+  inStock?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  categorySlug?: string;
 
   @IsOptional()
   @IsString()

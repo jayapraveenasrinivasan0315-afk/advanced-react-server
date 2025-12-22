@@ -12,7 +12,7 @@ import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { GetUserId } from '../auth/decorators/get-user-id.decorator';
+import { GetUserId } from '../decorators/get-user-id.decorator';
 
 @Controller('cart')
 @UseGuards(JwtAuthGuard)

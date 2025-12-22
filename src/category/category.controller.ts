@@ -68,4 +68,31 @@ export class CategoryController {
   remove(@Param('id') id: string) {
     return this.categoryService.remove(id);
   }
+
+  @Get(':slug/children')
+  findChildrenBySlug(
+    @Param('slug') slug: string,
+    @Query('locale') locale?: string,
+  ) {
+    return this.categoryService.findChildrenBySlug(slug, locale);
+  }
+
+  @Get('breadcrumbs/:slug')
+  async getBreadcrumbsBySlug(
+    @Param('slug') slug: string,
+    @Query('locale') locale: string = 'en',
+  ) {
+    return this.categoryService.getBreadcrumbsBySlug(slug, locale);
+  }
+
+  @Get('navigation/:slug')
+  async getCategoryNavigation(
+    @Param('slug') slug: string | undefined,
+    @Query('locale') locale: string = 'en',
+  ) {
+    return this.categoryService.getCategoryNavigation(
+      slug === 'undefined' ? undefined : slug,
+      locale,
+    );
+  }
 }

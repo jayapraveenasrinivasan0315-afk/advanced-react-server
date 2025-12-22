@@ -17,6 +17,7 @@ import { ReviewModule } from './review/review.module';
 import { FavoriteModule } from './favorite/favorite.module';
 import { TagModule } from './tag/tag.module';
 import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
+import { ShippingAddressModule } from './shipping-address/shipping-address.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ExchangeRateModule } from './exchange-rate/exchange-rate.module';
     TagModule,
     PromoBannerModule,
     ExchangeRateModule,
+    ShippingAddressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

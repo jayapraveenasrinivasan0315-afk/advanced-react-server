@@ -14,7 +14,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { GetUserId } from '../auth/decorators/get-user-id.decorator';
+import { GetUserId } from '../decorators/get-user-id.decorator';
 
 @Controller('reviews')
 export class ReviewController {

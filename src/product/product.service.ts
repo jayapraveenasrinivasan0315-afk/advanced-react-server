@@ -9,6 +9,7 @@ import { CreateProductI18nDto } from './dto/create-product-i18n.dto';
 import { UpdateProductI18nDto } from './dto/update-product-i18n.dto';
 import { ProductQueryI18nDto } from './dto/product-query-i18n.dto';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class ProductService {
@@ -218,116 +219,142 @@ export class ProductService {
   async findAll(query: ProductQueryI18nDto) {
     const {
       search,
-      categoryIds,
+      categoryId,
+      categorySlug,
       tagId,
       minPrice,
       maxPrice,
+      brands,
+      countries,
+      inStock,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
       limit = 10,
       locale = 'uk',
+      currency = 'USD',
     } = query;
 
-    const where: Prisma.ProductWhereInput = {
-      AND: [
-        {
-          stock: {
-            gt: 0,
-          },
-        },
-        search
-          ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { description: { contains: search, mode: 'insensitive' } },
-                { shortDescription: { contains: search, mode: 'insensitive' } },
-                { slug: { contains: search, mode: 'insensitive' } },
-                // Пошук по перекладах
-                {
-                  translations: {
-                    some: {
-                      locale,
-                      OR: [
-                        { name: { contains: search, mode: 'insensitive' } },
-                        {
-                          description: {
-                            contains: search,
-                            mode: 'insensitive',
-                          },
-                        },
-                        {
-                          shortDescription: {
-                            contains: search,
-                            mode: 'insensitive',
-                          },
-                        },
-                        { slug: { contains: search, mode: 'insensitive' } },
-                      ],
-                    },
+    // =====================================================================
+    // 1. Категорії (з урахуванням сабкатегорій)
+    // =====================================================================
+    let categoryIds: string[] = [];
+
+    if (categoryId) {
+      categoryIds = await this.getCategoryWithDescendantsIds(categoryId);
+    }
+
+    if (categorySlug) {
+      categoryIds = await this.getCategoryIdsBySlug(categorySlug, locale);
+    }
+
+    // =====================================================================
+    // 2. БАЗОВИЙ WHERE (для продуктів)
+    // =====================================================================
+    const baseAnd: Prisma.ProductWhereInput[] = [
+      { isActive: true },
+
+      inStock === true ? { stock: { gt: 0 } } : {},
+
+      brands?.length ? { brand: { in: brands } } : {},
+
+      countries?.length ? { country: { in: countries } } : {},
+
+      minPrice !== undefined ? { price: { gte: minPrice } } : {},
+      maxPrice !== undefined ? { price: { lte: maxPrice } } : {},
+
+      categoryIds.length
+        ? {
+            categories: {
+              some: { id: { in: categoryIds } },
+            },
+          }
+        : {},
+
+      tagId
+        ? {
+            tags: {
+              some: { id: tagId },
+            },
+          }
+        : {},
+
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' } },
+              { slug: { contains: search, mode: 'insensitive' } },
+              {
+                translations: {
+                  some: {
+                    locale,
+                    OR: [
+                      { name: { contains: search, mode: 'insensitive' } },
+                      { slug: { contains: search, mode: 'insensitive' } },
+                    ],
                   },
                 },
-              ],
-            }
-          : {},
-        categoryIds && categoryIds.length > 0
-          ? {
-              categories: {
-                some: {
-                  id: { in: categoryIds },
-                },
               },
-            }
-          : {},
-        tagId
-          ? {
-              tags: {
-                some: {
-                  id: tagId,
-                },
-              },
-            }
-          : {},
-        minPrice !== undefined ? { price: { gte: minPrice } } : {},
-        maxPrice !== undefined ? { price: { lte: maxPrice } } : {},
-      ],
+            ],
+          }
+        : {},
+    ];
+
+    const where: Prisma.ProductWhereInput = {
+      AND: baseAnd,
     };
 
+    // =====================================================================
+    // 3. SORT
+    // =====================================================================
     let orderBy:
       | Prisma.ProductOrderByWithRelationInput
       | Prisma.ProductOrderByWithRelationInput[];
 
     if (sortBy === 'sales') {
-      orderBy = [
-        {
-          orderItems: {
-            _count: sortOrder,
-          },
-        },
-        {
-          createdAt: sortOrder,
-        },
-      ];
+      orderBy = [{ orderItems: { _count: sortOrder } }, { createdAt: 'desc' }];
     } else if (sortBy === 'rating') {
-      orderBy = [
-        {
-          reviews: {
-            _count: sortOrder,
-          },
-        },
-        {
-          createdAt: sortOrder,
-        },
-      ];
+      orderBy = [{ reviews: { _count: sortOrder } }, { createdAt: 'desc' }];
     } else {
-      orderBy = {
-        [sortBy]: sortOrder,
-      };
+      orderBy = { [sortBy]: sortOrder };
     }
 
+    // =====================================================================
+    // 4. PAGINATION
+    // =====================================================================
     const skip = (page - 1) * limit;
 
-    const [products, total] = await Promise.all([
+    // =====================================================================
+    // 5. FACETS (без власного фільтра)
+    // =====================================================================
+
+    const whereWithoutPrice: Prisma.ProductWhereInput = {
+      AND: baseAnd.filter((f: any) => !f.price),
+    };
+
+    const whereWithoutBrand: Prisma.ProductWhereInput = {
+      AND: baseAnd.filter((f: any) => !f.brand),
+    };
+
+    const whereWithoutCountry: Prisma.ProductWhereInput = {
+      AND: baseAnd.filter((f: any) => !f.country),
+    };
+
+    const whereWithoutStock: Prisma.ProductWhereInput = {
+      AND: baseAnd.filter((f: any) => !f.stock),
+    };
+
+    // =====================================================================
+    // 6. QUERIES (паралельно)
+    // =====================================================================
+    const [
+      products,
+      total,
+      priceFacet,
+      brandFacetRaw,
+      countryFacetRaw,
+      stockFacetRaw,
+    ] = await Promise.all([
       this.prisma.product.findMany({
         where,
         orderBy,
@@ -335,16 +362,155 @@ export class ProductService {
         take: limit,
         include: this.getIncludeWithTranslations(locale),
       }),
+
       this.prisma.product.count({ where }),
+
+      // PRICE FACET
+      this.prisma.product.aggregate({
+        where: whereWithoutPrice,
+        _min: { price: true },
+        _max: { price: true },
+      }),
+
+      // BRAND FACET
+      this.prisma.product.groupBy({
+        by: ['brand'],
+        where: {
+          ...whereWithoutBrand,
+          brand: { not: null },
+        },
+        _count: { _all: true },
+      }),
+
+      // COUNTRY FACET
+      this.prisma.product.groupBy({
+        by: ['country'],
+        where: {
+          ...whereWithoutCountry,
+          country: { not: null },
+        },
+        _count: { _all: true },
+      }),
+
+      // STOCK FACET
+      this.prisma.product.groupBy({
+        by: ['stock'],
+        where: whereWithoutStock,
+        _count: { _all: true },
+      }),
     ]);
 
+    // =====================================================================
+    // 7. TRANSFORM PRODUCTS (i18n + currency)
+    // =====================================================================
     const transformedProducts = await Promise.all(
-      products.map((product) =>
-        this.transformProductWithTranslation(product, locale, query.currency),
+      products.map((p) =>
+        this.transformProductWithTranslation(p, locale, currency),
       ),
     );
 
-    return { products: transformedProducts, total };
+    // =====================================================================
+    // 8. FACETS NORMALIZATION + CURRENCY CONVERSION
+    // =====================================================================
+    const inStockCount = stockFacetRaw.reduce(
+      (acc, s) => {
+        if (s.stock > 0) acc.true += s._count._all;
+        else acc.false += s._count._all;
+        return acc;
+      },
+      { true: 0, false: 0 },
+    );
+
+    // Конвертуємо мін/макс ціни для facets
+    let minPriceFacet = priceFacet._min.price;
+    let maxPriceFacet = priceFacet._max.price;
+
+    if (
+      currency !== 'USD' &&
+      minPriceFacet !== null &&
+      maxPriceFacet !== null
+    ) {
+      [minPriceFacet, maxPriceFacet] = await Promise.all([
+        this.exchangeRateService
+          .convertPrice(minPriceFacet.toNumber(), 'USD', currency)
+          .then((n) => new Decimal(n)),
+        this.exchangeRateService
+          .convertPrice(maxPriceFacet.toNumber(), 'USD', currency)
+          .then((n) => new Decimal(n)),
+      ]);
+    }
+
+    // =====================================================================
+    // 9. RESPONSE
+    // =====================================================================
+    return {
+      products: transformedProducts,
+      total,
+      page,
+      limit,
+      facets: {
+        priceRange: {
+          min: minPriceFacet?.toNumber(),
+          max: maxPriceFacet?.toNumber(),
+        },
+        brands: brandFacetRaw.map((b) => ({
+          value: b.brand,
+          count: b._count._all,
+        })),
+        countries: countryFacetRaw.map((c) => ({
+          value: c.country,
+          count: c._count._all,
+        })),
+        inStock: inStockCount,
+      },
+    };
+  }
+  // =======================================================================
+  // ======================== ДОПОМІЖНІ МЕТОДИ ===============================
+  // =======================================================================
+
+  private async getCategoryWithDescendantsIds(
+    categoryId: string,
+  ): Promise<string[]> {
+    const ids: string[] = [categoryId];
+
+    const children = await this.prisma.category.findMany({
+      where: { parentId: categoryId },
+      select: { id: true },
+    });
+
+    for (const child of children) {
+      const childIds = await this.getCategoryWithDescendantsIds(child.id);
+      ids.push(...childIds);
+    }
+
+    return ids;
+  }
+
+  private async getCategoryIdsBySlug(
+    slug: string,
+    locale: string,
+  ): Promise<string[]> {
+    const category = await this.prisma.category.findFirst({
+      where: {
+        OR: [
+          { slug },
+          {
+            translations: {
+              some: {
+                slug,
+                locale,
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!category) return [];
+
+    return this.getCategoryWithDescendantsIds(category.id);
   }
 
   async findOne(id: string, locale: string = 'uk', currency: string = 'USD') {
@@ -360,6 +526,7 @@ export class ProductService {
     const transformedProduct = await this.transformProductWithTranslation(
       product,
       locale,
+      currency,
     );
 
     const averageRating =
@@ -410,6 +577,7 @@ export class ProductService {
     const transformedProduct = await this.transformProductWithTranslation(
       product,
       locale,
+      currency,
     );
 
     const averageRating =
@@ -544,8 +712,10 @@ export class ProductService {
       ],
     });
 
-    return products.map((product) =>
-      this.transformProductWithTranslation(product, locale),
+    return Promise.all(
+      products.map((product) =>
+        this.transformProductWithTranslation(product, locale, currency),
+      ),
     );
   }
 
@@ -705,8 +875,10 @@ export class ProductService {
       },
     });
 
-    return products.map((product) =>
-      this.transformProductWithTranslation(product, locale),
+    return Promise.all(
+      products.map((product) =>
+        this.transformProductWithTranslation(product, locale, currency),
+      ),
     );
   }
 }

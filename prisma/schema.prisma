@@ -38,6 +38,8 @@ model User {
   orders            Order[]
   reviews           Review[]
   favoriteProducts  FavoriteProduct[]
+  shippingAddresses ShippingAddress[]
+
    
   @@map("users")
 }
@@ -45,6 +47,24 @@ model User {
 enum AuthProvider {
   LOCAL
   GOOGLE
+}
+
+model ShippingAddress {
+  id                 String   @id @default(cuid())
+  userId             String
+  streetAddress      String
+  city               String
+  numberOfApartment  String
+  zipCode            String
+  latitude           Float?   
+  longitude         Float?   
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("shipping_addresses")
 }
 
 model VerificationCode {
@@ -92,7 +112,7 @@ model Category {
   parentId    String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime  @updatedAt 
 
   parent       Category?  @relation("CategoryParent", fields: [parentId], references: [id])
   children     Category[] @relation("CategoryParent")
@@ -132,6 +152,9 @@ model Product {
   stock           Int        @default(0)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+  isActive        Boolean    @default(true)
+  brand       String?    
+  country     String?   
 
   categories       Category[]  @relation("ProductCategories")
   tags             Tag[]       @relation("ProductTags")

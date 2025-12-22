@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { FavoriteService } from './favorite.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { GetUserId } from '../auth/decorators/get-user-id.decorator';
+import { GetUserId } from '../decorators/get-user-id.decorator';
 
 @Controller('favorites')
 @UseGuards(JwtAuthGuard)
