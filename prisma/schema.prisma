@@ -15,11 +15,8 @@ datasource db {
 
 model User {
   id           String    @id @default(cuid())
-  email        String?   @unique
   phone        String?   @unique
   password     String?   
-  googleId     String?   @unique
-  provider     AuthProvider @default(LOCAL)
   isVerified   Boolean   @default(false)
   verifiedAt   DateTime?
   firstName    String?
@@ -42,11 +39,6 @@ model User {
 
    
   @@map("users")
-}
-
-enum AuthProvider {
-  LOCAL
-  GOOGLE
 }
 
 model ShippingAddress {
@@ -78,12 +70,7 @@ model VerificationCode {
    
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
    
-  @@map("verification_codes")
-}
-
-enum VerificationType {
-  REGISTRATION
-  GOOGLE_AUTH
+ 
 }
 
 model RefreshToken {
@@ -101,6 +88,10 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+enum VerificationType {
+  REGISTRATION
+  PASSWORD_RESET
+}
 
 model Category {
   id          String    @id @default(cuid())
@@ -112,7 +103,7 @@ model Category {
   parentId    String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt 
+  updatedAt   DateTime  @updatedAt
 
   parent       Category?  @relation("CategoryParent", fields: [parentId], references: [id])
   children     Category[] @relation("CategoryParent")
@@ -120,8 +111,8 @@ model Category {
   translations CategoryTranslation[] // Додайте це поле
 
   @@map("categories")
-}
 
+}
 
 model CategoryTranslation {
   id          String   @id @default(cuid())

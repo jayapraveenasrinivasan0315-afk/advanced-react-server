@@ -14,7 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { ResendCodeDto } from './dto/resend-code.dto';
-import { VerificationType, AuthProvider } from '@prisma/client';
+import { VerificationType } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
@@ -30,142 +30,39 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.userService.findByEmailOrPhone(
-      registerDto.email,
+    const existingUser = await this.userService.findByPhone(
       registerDto.phone,
     );
 
     if (existingUser) {
       throw new BadRequestException({ code: 'USER_ALREADY_EXISTS' });
     }
-    const contact = registerDto.email || registerDto.phone;
 
-    if (!contact) {
-      throw new BadRequestException({ code: 'CONTACT_REQUIRED' });
-    }
-
-    const user = await this.userService.create(registerDto);
-
-    const code = await this.verificationService.createVerificationCode(
-      user.id,
-      VerificationType.REGISTRATION,
-    );
-
-    const isEmail = !!registerDto.email;
-
-    await this.verificationService.sendVerificationCode(contact, code, isEmail);
-
-    return;
-  }
-
-  async googleAuth(googleUser: any) {
-    console.log(googleUser);
-    let user = await this.prisma.user.findUnique({
-      where: { googleId: googleUser.googleId },
-    });
-
-    if (!user) {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: googleUser.email },
-      });
-
-      if (existingUser && existingUser.provider === AuthProvider.LOCAL) {
-        throw new BadRequestException({ code: 'EMAIL_TAKEN_LOCAL' });
-      }
-
-      user = await this.prisma.user.create({
-        data: {
-          email: googleUser.email,
-          googleId: googleUser.googleId,
-          isVerified: true,
-          provider: AuthProvider.GOOGLE,
-        },
-      });
-    }
-
-    return user;
-  }
-
-  async handleGoogleLogin(googleUser: any): Promise<string> {
-    try {
-      const user = await this.googleAuth(googleUser);
-
-      const code = await this.verificationService.createVerificationCode(
-        user.id,
-        VerificationType.GOOGLE_AUTH,
-      );
-
-      return code;
-    } catch (error) {
-      throw new BadRequestException({ code: 'GOOGLE_AUTH_FAILED' });
-    }
-  }
-
-  async verifyGoogleCode(code: string) {
-    console.log(code);
-    const verification = await this.prisma.verificationCode.findFirst({
-      where: {
-        code,
-        type: VerificationType.GOOGLE_AUTH,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
+    // Auto-verify user (no SMS verification needed)
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const user = await this.prisma.user.create({
+      data: {
+        phone: registerDto.phone?.trim(),
+        password: hashedPassword,
+        isVerified: true,
       },
-      include: { user: true },
-    });
-
-    if (!verification) {
-      throw new BadRequestException({ code: 'GOOGLE_CODE_INVALID' });
-    }
-
-    await this.prisma.verificationCode.update({
-      where: { id: verification.id },
-      data: { isUsed: true },
-    });
-
-    const tokens = await this.issueAndPersistTokens(verification.user.id);
-
-    return {
-      user: {
-        id: verification.user.id,
-        email: verification.user.email,
-        phone: verification.user.phone,
-        isVerified: verification.user.isVerified,
-        provider: verification.user.provider,
+      select: {
+        id: true,
+        phone: true,
+        firstName: true,
+        lastName: true,
+        avatar: true,
       },
-      tokens,
-    };
-  }
-
-  async exchangeGoogleCode(code: string) {
-    const verification = await this.prisma.verificationCode.findFirst({
-      where: {
-        code,
-        type: VerificationType.GOOGLE_AUTH,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      include: { user: true },
     });
 
-    if (!verification) {
-      throw new BadRequestException({ code: 'GOOGLE_CODE_INVALID' });
-    }
+    // Generate tokens immediately
+    const tokens = await this.issueAndPersistTokens(user.id);
 
-    await this.prisma.verificationCode.update({
-      where: { id: verification.id },
-      data: { isUsed: true },
-    });
-
-    return {
-      user: verification.user,
-    };
+    return { user, tokens };
   }
 
   async verifyRegistration(verifyCodeDto: VerifyCodeDto) {
-    const user = await this.userService.findByEmailOrPhone(
-      verifyCodeDto.email,
-      verifyCodeDto.phone,
-    );
+    const user = await this.userService.findByPhone(verifyCodeDto.phone);
 
     if (!user) {
       throw new NotFoundException({ code: 'USER_NOT_FOUND' });
@@ -184,7 +81,6 @@ export class AuthService {
     return {
       user: {
         id: verifiedUser.id,
-        email: verifiedUser.email,
         phone: verifiedUser.phone,
         isVerified: verifiedUser.isVerified,
       },
@@ -193,16 +89,11 @@ export class AuthService {
   }
 
   async resendVerificationCode(resendCodeDto: ResendCodeDto) {
-    const user = await this.userService.findByEmailOrPhone(
-      resendCodeDto.email,
-      resendCodeDto.phone,
-    );
-
-    const contact = resendCodeDto.email || resendCodeDto.phone;
-
-    if (!contact) {
+    if (!resendCodeDto.phone) {
       throw new BadRequestException({ code: 'CONTACT_REQUIRED' });
     }
+
+    const user = await this.userService.findByPhone(resendCodeDto.phone);
 
     if (!user) {
       throw new BadRequestException({ code: 'USER_NOT_FOUND' });
@@ -212,9 +103,6 @@ export class AuthService {
       throw new BadRequestException({ code: 'USER_ALREADY_VERIFIED' });
     }
 
-    if (user.provider === AuthProvider.GOOGLE) {
-      throw new BadRequestException({ code: 'GOOGLE_USER_NO_VERIFICATION' });
-    }
 
     const unusedCodesCount = await this.prisma.verificationCode.count({
       where: {
@@ -232,19 +120,16 @@ export class AuthService {
       user.id,
       VerificationType.REGISTRATION,
     );
-    const isEmail = !!resendCodeDto.email;
-
-    await this.verificationService.sendVerificationCode(contact, code, isEmail);
+    await this.verificationService.sendVerificationCode(
+      resendCodeDto.phone,
+      code,
+    );
 
     return;
   }
 
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto);
-
-    if (user.provider === AuthProvider.GOOGLE) {
-      throw new BadRequestException({ code: 'LOGIN_USE_GOOGLE' });
-    }
 
     if (!user.isVerified) {
       throw new UnauthorizedException({ code: 'ACCOUNT_NOT_VERIFIED' });
@@ -254,25 +139,16 @@ export class AuthService {
     return {
       user: {
         id: user.id,
-        email: user.email,
         phone: user.phone,
-        provider: user.provider,
       },
       tokens,
     };
   }
 
   async validateUser(loginDto: LoginDto) {
-    const user = await this.userService.findByEmailOrPhone(
-      loginDto.email,
-      loginDto.phone,
-    );
+    const user = await this.userService.findByPhone(loginDto.phone);
 
     if (!user) {
-      throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
-    }
-
-    if (user.provider === AuthProvider.GOOGLE) {
       throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS' });
     }
 
@@ -334,9 +210,7 @@ export class AuthService {
     return {
       user: {
         id: user.id,
-        email: user.email,
         phone: user.phone,
-        provider: user.provider,
       },
       tokens: newTokens,
     };

@@ -9,9 +9,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { UserService } from 'src/user/user.service';
 import { VerificationService } from 'src/verification/verification.service';
-import { EmailService } from 'src/email/email.service';
 import { SmsService } from 'src/sms/sms.service';
-import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
@@ -32,10 +30,8 @@ import { GoogleStrategy } from './strategies/google.strategy';
     AuthService,
     JwtStrategy,
     LocalStrategy,
-    GoogleStrategy,
     UserService,
     VerificationService,
-    EmailService,
     SmsService,
   ],
 })

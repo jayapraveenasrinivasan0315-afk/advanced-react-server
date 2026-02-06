@@ -7,7 +7,6 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { VerificationModule } from './verification/verification.module';
-import { EmailModule } from './email/email.module';
 import { SmsModule } from './sms/sms.module';
 import { ProductModule } from './product/product.module';
 import { CategoryModule } from './category/category.module';
@@ -26,7 +25,6 @@ import { ShippingAddressModule } from './shipping-address/shipping-address.modul
     UserModule,
     AuthModule,
     VerificationModule,
-    EmailModule,
     SmsModule,
     ProductModule,
     CategoryModule,

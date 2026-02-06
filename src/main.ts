@@ -8,29 +8,41 @@ import { join } from 'path';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // ✅ Global validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       transform: true,
     }),
   );
 
+  // ✅ Cookie parser (required for refresh tokens)
   app.use(cookieParser());
-  app.use('/static', express.static(join(__dirname, '..', 'static')));
 
+  // ✅ Static files (if you use uploads / assets)
+  app.use('/static', express.static(join(process.cwd(), 'static')));
+
+  // ✅ CORS CONFIG (FIXED)
   app.enableCors({
-    origin: process.env.FRONTEND_URL || true,
-    credentials: true,
+    origin: (origin, callback) => {
+      // Allow localhost:5173 (local dev) and nginx container (Docker)
+      const allowedOrigins = ['http://localhost:5173', 'http://localhost', 'http://advanced-react'];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS not allowed'), false);
+      }
+    },
+    credentials: true,               // 👈 REQUIRED for cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(join(__dirname, '..', 'static'));
 
-  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
 }
 
 bootstrap();

@@ -90,7 +90,6 @@ export class OrderService {
           user: {
             select: {
               id: true,
-              email: true,
               firstName: true,
               lastName: true,
             },
@@ -170,7 +169,6 @@ export class OrderService {
           user: {
             select: {
               id: true,
-              email: true,
               firstName: true,
               lastName: true,
             },
@@ -217,7 +215,6 @@ export class OrderService {
         user: {
           select: {
             id: true,
-            email: true,
             firstName: true,
             lastName: true,
             phone: true,
@@ -255,7 +252,6 @@ export class OrderService {
         user: {
           select: {
             id: true,
-            email: true,
             firstName: true,
             lastName: true,
             phone: true,
@@ -296,7 +292,6 @@ export class OrderService {
         user: {
           select: {
             id: true,
-            email: true,
             firstName: true,
             lastName: true,
           },

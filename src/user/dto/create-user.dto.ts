@@ -1,8 +1,8 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsPhoneNumber, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
-  @IsEmail()
-  email: string;
+  @IsPhoneNumber()
+  phone: string;
 
   @IsString()
   @MinLength(6)

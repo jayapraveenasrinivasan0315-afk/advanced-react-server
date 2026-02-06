@@ -49,7 +49,7 @@ JWT_REFRESH_EXPIRATION_TIME="7d"
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://localhost:3000/auth/google/callback"
+GOOGLE_CALLBACK_URL="http://localhost:3001/auth/google/callback"
 
 # Frontend URL (for OAuth redirects)
 FRONTEND_URL="http://localhost:3001"
@@ -72,7 +72,7 @@ VONAGE_FROM_NUMBER="your-vonage-phone-number"
 2. Create a new project or select an existing one
 3. Enable the Google+ API
 4. Go to "Credentials" and create an OAuth 2.0 Client ID
-5. Add your redirect URI: `http://localhost:3000/auth/google/callback`
+5. Add your redirect URI: `http://localhost:3001/auth/google/callback`
 6. Copy the Client ID and Client Secret to your `.env` file
 
 ## API Endpoints

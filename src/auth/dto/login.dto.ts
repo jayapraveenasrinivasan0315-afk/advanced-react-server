@@ -1,22 +1,14 @@
 import {
   IsString,
-  IsOptional,
-  IsEmail,
   IsPhoneNumber,
-  ValidateIf,
+  MinLength,
 } from 'class-validator';
 
 export class LoginDto {
-  @IsOptional()
-  @IsEmail()
-  @ValidateIf((o) => !o.phone)
-  email?: string;
-
-  @IsOptional()
   @IsPhoneNumber()
-  @ValidateIf((o) => !o.email)
-  phone?: string;
+  phone: string;
 
   @IsString()
+  @MinLength(6)
   password: string;
 }
