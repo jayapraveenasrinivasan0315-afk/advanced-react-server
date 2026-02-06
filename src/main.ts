@@ -26,8 +26,8 @@ async function bootstrap() {
   // ✅ CORS CONFIG (FIXED)
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow localhost:5173 (local dev) and nginx container (Docker)
-      const allowedOrigins = ['http://localhost:5173', 'http://localhost', 'http://advanced-react'];
+      // Allow localhost:80 (local dev) and nginx container (Docker)
+      const allowedOrigins = ['http://localhost:80', 'http://localhost', 'http://advanced-react'];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
