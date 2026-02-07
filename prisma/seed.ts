@@ -32,7 +32,7 @@ async function main() {
         update: {},
         create: {
           id: 'banner-1',
-          imageUrl: 'http://localhost:3001/static/banner1.jpg',
+          imageUrl: 'http://100.27.250.197:3001/static/banner1.jpg',
           title: 'Summer Collection',
           description: 'Check out our new summer collection',
           link: '/summer-collection',
@@ -44,7 +44,7 @@ async function main() {
         update: {},
         create: {
           id: 'banner-2',
-          imageUrl: 'http://localhost:3001/static/banner2.png',
+          imageUrl: 'http://100.27.250.197:3001/static/banner2.png',
           title: 'Special Offer',
           description: 'Get 20% off on selected items',
           link: '/special-offers',
