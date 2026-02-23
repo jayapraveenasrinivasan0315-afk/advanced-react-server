@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
+const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '');
 
 async function main() {
   console.log('Seeding database...');
@@ -32,7 +33,7 @@ async function main() {
         update: {},
         create: {
           id: 'banner-1',
-          imageUrl: 'http://100.27.250.197:3001/static/banner1.jpg',
+          imageUrl: `${publicBaseUrl}/static/banner1.jpg`,
           title: 'Summer Collection',
           description: 'Check out our new summer collection',
           link: '/summer-collection',
@@ -44,7 +45,7 @@ async function main() {
         update: {},
         create: {
           id: 'banner-2',
-          imageUrl: 'http://100.27.250.197:3001/static/banner2.png',
+          imageUrl: `${publicBaseUrl}/static/banner2.png`,
           title: 'Special Offer',
           description: 'Get 20% off on selected items',
           link: '/special-offers',

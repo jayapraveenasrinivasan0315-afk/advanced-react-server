@@ -7,6 +7,10 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const corsOrigins = (process.env.CORS_ORIGINS ?? process.env.FRONTEND_URL ?? 'http://localhost:80,http://localhost')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   // ✅ Global validation
   app.useGlobalPipes(
@@ -23,12 +27,10 @@ async function bootstrap() {
   // ✅ Static files (if you use uploads / assets)
   app.use('/static', express.static(join(process.cwd(), 'static')));
 
-  // ✅ CORS CONFIG (FIXED)
+  // ✅ CORS CONFIG
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow 100.27.250.197:80 (local dev) and nginx container (Docker)
-      const allowedOrigins = ['http://100.27.250.197:80', 'http://100.27.250.197', 'http://advanced-react'];
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || corsOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('CORS not allowed'), false);
@@ -40,7 +42,7 @@ async function bootstrap() {
   });
 
   const port = process.env.PORT || 8000;
-  await app.listen(port,'0.0.0.0');
+  await app.listen(port, '0.0.0.0');
 
   console.log(`🚀 Application is running on: http://0.0.0.0:${port}`);
 }

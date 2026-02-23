@@ -39,7 +39,7 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Database
-DATABASE_URL="postgresql://username:password@100.27.250.197:5432/react-course?schema=public"
+DATABASE_URL="postgresql://username:password@db:5432/react-course?schema=public"
 
 # JWT Configuration
 JWT_SECRET="your-super-secret-jwt-key-here"
@@ -49,10 +49,12 @@ JWT_REFRESH_EXPIRATION_TIME="7d"
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://100.27.250.197:3001/auth/google/callback"
+GOOGLE_CALLBACK_URL="https://api.myapp.com/auth/google/callback"
 
 # Frontend URL (for OAuth redirects)
-FRONTEND_URL="http://100.27.250.197:3001"
+FRONTEND_URL="https://myapp.com"
+CORS_ORIGINS="https://myapp.com,https://www.myapp.com"
+PUBLIC_BASE_URL="https://api.myapp.com"
 
 # Email Configuration (for nodemailer)
 EMAIL_HOST="smtp.gmail.com"
@@ -72,7 +74,7 @@ VONAGE_FROM_NUMBER="your-vonage-phone-number"
 2. Create a new project or select an existing one
 3. Enable the Google+ API
 4. Go to "Credentials" and create an OAuth 2.0 Client ID
-5. Add your redirect URI: `http://100.27.250.197:3001/auth/google/callback`
+5. Add your redirect URI: `https://api.myapp.com/auth/google/callback`
 6. Copy the Client ID and Client Secret to your `.env` file
 
 ## API Endpoints
